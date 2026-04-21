@@ -324,7 +324,7 @@ document.addEventListener('DOMContentLoaded', function() {
     modal.show();
   });
 
-  // Upload form submit - Upload ke backend
+  // Upload form submit - Client side processing, embed metadata dalam JSON
   document.getElementById('uploadForm').addEventListener('submit', function(e) {
     e.preventDefault();
     
@@ -336,52 +336,66 @@ document.addEventListener('DOMContentLoaded', function() {
       return;
     }
     
-    // Show loading state
-    const submitBtn = document.querySelector('#uploadForm button[type="submit"]');
-    const originalText = submitBtn.textContent;
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Uploading...';
-    
-    // Prepare FormData untuk submit ke server
-    const formData = new FormData();
-    formData.append('jsonFile', file);
-    formData.append('adminName', currentUser ? currentUser.name : 'Administrator');
-    
-    // Upload ke backend
-    fetch('upload.php', {
-      method: 'POST',
-      body: formData
-    })
-    .then(response => response.json())
-    .then(data => {
-      if (data.success) {
-        // Clear localStorage to force fresh load dari server
-        localStorage.removeItem('uploadedData');
-        localStorage.removeItem('uploadedTime');
-        localStorage.removeItem('uploadedBy');
+    const reader = new FileReader();
+    reader.onload = function(event) {
+      try {
+        let jsonData = JSON.parse(event.target.result);
         
-        // Save metadata dari server response
-        localStorage.setItem('uploadedTime', data.data.uploadedTime);
-        localStorage.setItem('uploadedBy', data.data.uploadedBy);
+        // Validasi format JSON (harus array)
+        if (!Array.isArray(jsonData)) {
+          throw new Error('File harus berisi array JSON!');
+        }
         
-        document.getElementById('uploadSuccess').textContent = `✅ ${data.message} (${data.data.totalRecords} records)`;
-        document.getElementById('uploadSuccess').style.display = 'block';
+        if (jsonData.length === 0) {
+          throw new Error('File kosong atau tidak ada data!');
+        }
+        
+        // Tambahkan metadata ke file
+        const metadata = {
+          _metadata: {
+            uploadedBy: currentUser ? currentUser.name : 'Administrator',
+            uploadedAt: new Date().toISOString(),
+            totalRecords: jsonData.length,
+            version: '1.0'
+          },
+          data: jsonData
+        };
+        
+        // Generate download file dengan struktur baru
+        const jsonString = JSON.stringify(metadata, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const downloadLink = document.createElement('a');
+        downloadLink.href = url;
+        downloadLink.download = 'data_monitoring.json';
+        
+        // Show download instruction
+        const downloadBtn = document.createElement('button');
+        downloadBtn.type = 'button';
+        downloadBtn.className = 'btn btn-primary w-100 mt-2';
+        downloadBtn.textContent = '⬇️ Download File JSON (Langkah 1)';
+        downloadBtn.onclick = function() {
+          downloadLink.click();
+        };
+        
+        const copyText = document.createElement('p');
+        copyText.className = 'text-muted mt-3 mb-2 text-center';
+        copyText.innerHTML = `<small><strong>Langkah 2:</strong> Buka folder dashboard Anda → Ganti file <code>data_monitoring.json</code> dengan file yang sudah didownload<br><strong>Langkah 3:</strong> Refresh dashboard di semua device, data akan sinkron otomatis ✨</small>`;
+        
+        const successDiv = document.getElementById('uploadSuccess');
+        successDiv.innerHTML = `✅ File siap! Metadata sudah ditambahkan (${jsonData.length} records dari ${currentUser ? currentUser.name : 'Admin'})`;
+        successDiv.style.display = 'block';
+        successDiv.appendChild(downloadBtn);
+        successDiv.appendChild(copyText);
+        
         document.getElementById('uploadError').style.display = 'none';
         
-        // Reload page setelah 2 detik untuk fetch data terbaru dari server
-        setTimeout(() => {
-          location.reload();
-        }, 2000);
-      } else {
-        throw new Error(data.message || 'Upload gagal');
+      } catch (err) {
+        document.getElementById('uploadError').textContent = 'Error: ' + err.message;
+        document.getElementById('uploadError').style.display = 'block';
       }
-    })
-    .catch(err => {
-      document.getElementById('uploadError').textContent = 'Error: ' + err.message;
-      document.getElementById('uploadError').style.display = 'block';
-      submitBtn.disabled = false;
-      submitBtn.textContent = originalText;
-    });
+    };
+    reader.readAsText(file);
   });
 
   // Login form submit
@@ -409,52 +423,60 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function loadTableData() {
-  // Fetch data dari server (data_monitoring.json) - selalu fresh dari server
-  let dataPromise;
-  
-  // Add cache busting untuk memastikan fresh load
+  // Fetch data dari data_monitoring.json - bisa format baru (dengan metadata) atau legacy (array)
   const timestamp = new Date().getTime();
-  dataPromise = fetch(`data_monitoring.json?t=${timestamp}`)
+  const dataPromise = fetch(`data_monitoring.json?t=${timestamp}`)
     .then(response => {
-      if (!response.ok) {
-        throw new Error('Gagal load data dari server');
-      }
+      if (!response.ok) throw new Error('Gagal load data');
       return response.json();
     })
     .catch(err => {
       console.error('Error loading data:', err);
-      return [];
+      return { data: [], _metadata: null };
     });
   
-  // Get metadata dari localStorage (untuk display info)
-  const uploadedTime = localStorage.getItem('uploadedTime');
-  const uploadedBy = localStorage.getItem('uploadedBy');
-  
-  // Update tanggal update data
+  // Update tanggal update data berdasarkan metadata dari JSON
   const updateDateTimeElement = document.getElementById('updateDateTime');
-  if (uploadedTime && uploadedBy) {
-    try {
-      const updateDate = new Date(uploadedTime);
-      const options = {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        timeZoneName: 'short'
-      };
-      const localDateStr = new Intl.DateTimeFormat('id-ID', options).format(updateDate);
-      updateDateTimeElement.textContent = `📅 Data diupdate oleh ${uploadedBy} pada: ${localDateStr}`;
-    } catch(e) {
-      updateDateTimeElement.textContent = '📅 Data terakhir diupdate: -';
-    }
-  } else {
-    updateDateTimeElement.textContent = '📅 Data siap ditampilkan';
-  }
   
-  dataPromise.then(data => {
+  dataPromise.then(responseData => {
+    // Parse structure - bisa format baru atau legacy
+    let data = [];
+    let metadata = null;
+    
+    if (Array.isArray(responseData)) {
+      // Format lama: array biasa
+      data = responseData;
+      metadata = null;
+    } else if (responseData._metadata && Array.isArray(responseData.data)) {
+      // Format baru: dengan metadata
+      metadata = responseData._metadata;
+      data = responseData.data;
+    }
+    
+    // Display metadata jika ada
+    if (metadata) {
+      try {
+        const updateDate = new Date(metadata.uploadedAt);
+        const options = {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          timeZoneName: 'short'
+        };
+        const localDateStr = new Intl.DateTimeFormat('id-ID', options).format(updateDate);
+        updateDateTimeElement.textContent = `📅 Data diupdate oleh ${metadata.uploadedBy} pada: ${localDateStr}`;
+      } catch(e) {
+        updateDateTimeElement.textContent = '📅 Data siap ditampilkan';
+      }
+    } else {
+      updateDateTimeElement.textContent = '📅 Data siap ditampilkan';
+    }
+    
+    if (data.length === 0) return;
     if (data.length === 0) return;
     
     // Destroy previous datatable instance jika ada
