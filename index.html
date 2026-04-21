@@ -342,9 +342,11 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!Array.isArray(jsonData)) {
           throw new Error('File harus berisi array JSON!');
         }
-        // Simpan ke localStorage dengan timestamp
+        // Simpan ke localStorage dengan timestamp dan admin name
+        const adminName = currentUser ? currentUser.name : 'Administrator';
         localStorage.setItem('uploadedData', JSON.stringify(jsonData));
         localStorage.setItem('uploadedTime', new Date().toISOString());
+        localStorage.setItem('uploadedBy', adminName);
         document.getElementById('uploadSuccess').textContent = 'File berhasil diupload! Data akan ditampilkan di dashboard.';
         document.getElementById('uploadSuccess').style.display = 'block';
         // Reload page setelah 2 detik
@@ -388,6 +390,8 @@ function loadTableData() {
   let dataPromise;
   const uploadedData = localStorage.getItem('uploadedData');
   const uploadedTime = localStorage.getItem('uploadedTime');
+  const uploadedBy = localStorage.getItem('uploadedBy');
+  
   if (uploadedData) {
     dataPromise = Promise.resolve(JSON.parse(uploadedData));
   } else {
@@ -397,31 +401,41 @@ function loadTableData() {
     });
   }
   
-  // Update tanggal update data
-  if (uploadedTime) {
-    const updateDate = new Date(uploadedTime);
-    const formattedDate = updateDate.toLocaleString('id-ID', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
-    });
-    document.getElementById('updateDateTime').textContent = `Data terakhir diupdate oleh ${currentUser ? currentUser.name : 'Admin'} pada ${formattedDate}`;
+  // Update tanggal update data - gunakan format ISO untuk konsistensi across devices
+  const updateDateTimeElement = document.getElementById('updateDateTime');
+  if (uploadedTime && uploadedBy) {
+    try {
+      // Parse ISO string dan convert ke local timezone
+      const updateDate = new Date(uploadedTime);
+      const options = {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        timeZoneName: 'short'
+      };
+      const localDateStr = new Intl.DateTimeFormat('id-ID', options).format(updateDate);
+      updateDateTimeElement.textContent = `📅 Data diupdate oleh ${uploadedBy} pada: ${localDateStr}`;
+    } catch(e) {
+      updateDateTimeElement.textContent = 'Data terakhir diupdate: -';
+    }
   } else {
-    const now = new Date();
-    const formattedDate = now.toLocaleString('id-ID', {
+    // Format tanggal loading untuk default data
+    const options = {
       weekday: 'long',
       year: 'numeric',
       month: 'long',
-      day: 'numeric',
+      day: '2-digit',
       hour: '2-digit',
       minute: '2-digit',
-      second: '2-digit'
-    });
-    document.getElementById('updateDateTime').textContent = `Data terakhir dimuat pada ${formattedDate}`;
+      second: '2-digit',
+      timeZoneName: 'short'
+    };
+    const localDateStr = new Intl.DateTimeFormat('id-ID', options).format(new Date());
+    updateDateTimeElement.textContent = `📅 Data default dimuat pada: ${localDateStr}`;
   }
   
   dataPromise.then(data => {
