@@ -99,82 +99,97 @@
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 <script>
 $(document).ready(function() {
-    fetch('data_monitoring.json')
-        .then(response => response.json())
-        .then(data => {
-            let tbody = '';
-            data.forEach(function(row, idx) {
-                tbody += `<tr class="pointer" data-idx="${idx}">
-                    <td>${row.Project_Code || '-'}</td>
-                    <td>${row.Project_Name || '-'}</td>
-                    <td>${row.PR_No || '-'}</td>
-                    <td>${row.PO_No || '-'}</td>
-                    <td>${row.PR_Date || '-'}</td>
-                    <td>${row.PR_Status || '-'}</td>
-                    <td>${row.PO_Payment || '-'}</td>
-                </tr>`;
-            });
-            document.querySelector('#monitoringTable tbody').innerHTML = tbody;
-            let table = $('#monitoringTable').DataTable({
-                responsive: true,
-                language: {
-                    search: "Cari:",
-                    lengthMenu: "Tampilkan _MENU_ entri",
-                    info: "Menampilkan _START_ sampai _END_ dari _TOTAL_ entri",
-                    paginate: {
-                        first: "Pertama",
-                        last: "Terakhir",
-                        next: "Berikutnya",
-                        previous: "Sebelumnya"
-                    }
-                }
-            });
-            $('#monitoringTable tbody').on('click', 'tr', function() {
-                let idx = $(this).data('idx');
-                let detail = data[idx];
-                const labelMap = {
-                    Project_Code: 'Project Code',
-                    Project_Name: 'Project Name',
-                    PR_No: 'Purchase Request No',
-                    PO_No: 'PO No',
-                    PR_Date: 'PR Date',
-                    Delivery_Date: 'Delivery Date',
-                    PO_Date: 'PO Date',
-                    Request_Delivery: 'Req Delivery',
-                    Item_Name: 'Item Name',
-                    Quantity: 'Total Purchase Order Qty',
-                    Invoicing_Status: 'Invoicing Status',
-                    Leadtime_PR_PO: 'ACT SPB TO REQUEST',
-                    Leadtime_PO_Deliv: 'STD LEADTIME PCH',
-                    ETA: 'ETA',
-                    Remark: 'ACT LEADTIME TO ETA',
-                    Act_Request_to_PO: 'SCORING SPB',
-                    Act_PR_to_Request: 'SCORING LEAD TIME',
-                    PR_Status: 'PR Status',
-                    PO_Payment: 'PO Payment'
-                };
-                let fields = [];
-                for (const key of Object.keys(labelMap)) {
-                    if (detail.hasOwnProperty(key)) {
-                        fields.push({label: labelMap[key], value: detail[key] || '-'});
-                    }
-                }
-                let leftCol = '', rightCol = '';
-                fields.forEach(function(field, i) {
-                    let html = `<div class=\"mb-2\"><strong>${field.label}:</strong> <span>${field.value}</span></div>`;
-                    if (i % 2 === 0) leftCol += html;
-                    else rightCol += html;
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbz70SGwiifbWhSygyblV4xEMKUZew5YKqNZ-p9oTmY6ylmfvxLemIfBBVxSfPzHWi1Q/exec'; // Ganti dengan URL Web App kamu
+
+    $(document).ready(function() {
+        // Tampilkan indikator loading
+        let loadingRow = `<tr><td colspan="7" class="text-center">Loading data...</td></tr>`;
+        $('#monitoringTable tbody').html(loadingRow);
+
+        fetch(GAS_URL)
+            .then(response => {
+                if (!response.ok) throw new Error('Network response was not ok');
+                return response.json();
+            })
+            .then(data => {
+                let tbody = '';
+                data.forEach(function(row, idx) {
+                    tbody += `<tr class="pointer" data-idx="${idx}">
+                        <td>${row.Project_Code || '-'}</td>
+                        <td>${row.Project_Name || '-'}</td>
+                        <td>${row.PR_No || '-'}</td>
+                        <td>${row.PO_No || '-'}</td>
+                        <td>${row.PR_Date || '-'}</td>
+                        <td>${row.PR_Status || '-'}</td>
+                        <td>${row.PO_Payment || '-'}</td>
+                    </tr>`;
                 });
-                let gridHtml = `<div class=\"row\">
-                    <div class=\"col-md-6\">${leftCol}</div>
-                    <div class=\"col-md-6\">${rightCol}</div>
-                </div>`;
-                $('.modal-body').html(gridHtml);
-                var modal = new bootstrap.Modal(document.getElementById('detailModal'));
-                modal.show();
+                $('#monitoringTable tbody').html(tbody);
+                $('#monitoringTable').DataTable({
+                    responsive: true,
+                    destroy: true,
+                    language: {
+                        search: "Cari:",
+                        lengthMenu: "Tampilkan _MENU_ entri",
+                        info: "Menampilkan _START_ sampai _END_ dari _TOTAL_ entri",
+                        paginate: {
+                            first: "Pertama",
+                            last: "Terakhir",
+                            next: "Berikutnya",
+                            previous: "Sebelumnya"
+                        }
+                    }
+                });
+                // Modal detail
+                $('#monitoringTable tbody').on('click', 'tr', function() {
+                    let idx = $(this).data('idx');
+                    let detail = data[idx];
+                    const labelMap = {
+                        Project_Code: 'Project Code',
+                        Project_Name: 'Project Name',
+                        PR_No: 'Purchase Request No',
+                        PO_No: 'PO No',
+                        PR_Date: 'PR Date',
+                        Delivery_Date: 'Delivery Date',
+                        PO_Date: 'PO Date',
+                        Request_Delivery: 'Req Delivery',
+                        Item_Name: 'Item Name',
+                        Quantity: 'Total Purchase Order Qty',
+                        Invoicing_Status: 'Invoicing Status',
+                        Leadtime_PR_PO: 'ACT SPB TO REQUEST',
+                        Leadtime_PO_Deliv: 'STD LEADTIME PCH',
+                        ETA: 'ETA',
+                        Remark: 'ACT LEADTIME TO ETA',
+                        Act_Request_to_PO: 'SCORING SPB',
+                        Act_PR_to_Request: 'SCORING LEAD TIME',
+                        PR_Status: 'PR Status',
+                        PO_Payment: 'PO Payment'
+                    };
+                    let fields = [];
+                    for (const key of Object.keys(labelMap)) {
+                        if (detail.hasOwnProperty(key)) {
+                            fields.push({label: labelMap[key], value: detail[key] || '-'});
+                        }
+                    }
+                    let leftCol = '', rightCol = '';
+                    fields.forEach(function(field, i) {
+                        let html = `<div class=\"mb-2\"><strong>${field.label}:</strong> <span>${field.value}</span></div>`;
+                        if (i % 2 === 0) leftCol += html;
+                        else rightCol += html;
+                    });
+                    let gridHtml = `<div class=\"row\">
+                        <div class=\"col-md-6\">${leftCol}</div>
+                        <div class=\"col-md-6\">${rightCol}</div>
+                    </div>`;
+                    $('.modal-body').html(gridHtml);
+                    var modal = new bootstrap.Modal(document.getElementById('detailModal'));
+                    modal.show();
+                });
+            })
+            .catch(error => {
+                let errorRow = `<tr><td colspan="7" class="text-center text-danger">Gagal mengambil data. Silakan coba lagi.<br>${error.message}</td></tr>`;
+                $('#monitoringTable tbody').html(errorRow);
             });
-        });
-});
-</script>
+    });
 </body>
 </html>
