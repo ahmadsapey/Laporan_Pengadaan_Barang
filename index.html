@@ -112,6 +112,12 @@ $(document).ready(function() {
                 return response.json();
             })
             .then(data => {
+                console.log('DEBUG DATA:', data);
+                if (!Array.isArray(data) || data.length === 0) {
+                    let emptyRow = `<tr><td colspan="7" class="text-center text-warning">Data kosong atau format tidak sesuai.</td></tr>`;
+                    $('#monitoringTable tbody').html(emptyRow);
+                    return;
+                }
                 let tbody = '';
                 data.forEach(function(row, idx) {
                     tbody += `<tr class="pointer" data-idx="${idx}">
