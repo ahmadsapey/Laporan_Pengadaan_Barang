@@ -89,6 +89,54 @@
             font-weight: 600;
             margin-right: 5px;
         }
+        .alert-sm {
+            margin-bottom: 0 !important;
+            font-size: 0.875rem;
+        }
+        @media (max-width: 576px) {
+            .navbar-brand {
+                font-size: 1rem !important;
+            }
+            .navbar {
+                padding: 0.5rem 1rem !important;
+            }
+            .container.py-4 {
+                padding: 0.75rem !important;
+            }
+            h2 {
+                font-size: 1.25rem !important;
+            }
+            .modern-table th, .modern-table td {
+                font-size: 11px !important;
+                padding: 4px 3px !important;
+            }
+            .table-header-navy th {
+                padding: 4px 3px !important;
+            }
+            .btn-sm {
+                padding: 0.25rem 0.5rem !important;
+                font-size: 0.75rem !important;
+            }
+            .gap-2 {
+                gap: 0.5rem !important;
+            }
+        }
+        @media (max-width: 768px) {
+            .modal-dialog {
+                margin: 1rem auto !important;
+            }
+            .modal-body .row {
+                flex-direction: column !important;
+            }
+            .modal-body .col-md-7,
+            .modal-body .col-md-5 {
+                width: 100% !important;
+                margin-bottom: 1rem !important;
+            }
+            .pie-chart-container {
+                max-width: 300px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -106,7 +154,14 @@
 </nav>
 
 <div class="container py-4">
-    <h2 class="mb-4 text-center">Dashboard Monitoring Pengadaan Barang</h2>
+    <div class="row mb-3">
+      <div class="col-12">
+        <h2 class="text-center">Dashboard Monitoring Pengadaan Barang</h2>
+        <div class="alert alert-info alert-sm text-center" style="margin: 0; padding: 0.5rem;">
+          <small id="updateDateTime">Data terakhir diupdate: -</small>
+        </div>
+      </div>
+    </div>
     <div id="tableContainer" class="table-responsive">
         <table id="monitoringTable" class="table table-bordered table-hover align-middle modern-table text-center" style="table-layout: fixed; width: 100%;">
             <thead class="table-header-navy">
@@ -287,8 +342,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!Array.isArray(jsonData)) {
           throw new Error('File harus berisi array JSON!');
         }
-        // Simpan ke localStorage
+        // Simpan ke localStorage dengan timestamp
         localStorage.setItem('uploadedData', JSON.stringify(jsonData));
+        localStorage.setItem('uploadedTime', new Date().toISOString());
         document.getElementById('uploadSuccess').textContent = 'File berhasil diupload! Data akan ditampilkan di dashboard.';
         document.getElementById('uploadSuccess').style.display = 'block';
         // Reload page setelah 2 detik
@@ -331,6 +387,7 @@ function loadTableData() {
   // Cek apakah ada data yang diupload, jika ada gunakan itu, jika tidak gunakan data_monitoring.json
   let dataPromise;
   const uploadedData = localStorage.getItem('uploadedData');
+  const uploadedTime = localStorage.getItem('uploadedTime');
   if (uploadedData) {
     dataPromise = Promise.resolve(JSON.parse(uploadedData));
   } else {
@@ -339,6 +396,34 @@ function loadTableData() {
       return [];
     });
   }
+  
+  // Update tanggal update data
+  if (uploadedTime) {
+    const updateDate = new Date(uploadedTime);
+    const formattedDate = updateDate.toLocaleString('id-ID', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+    document.getElementById('updateDateTime').textContent = `Data terakhir diupdate oleh ${currentUser ? currentUser.name : 'Admin'} pada ${formattedDate}`;
+  } else {
+    const now = new Date();
+    const formattedDate = now.toLocaleString('id-ID', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+    document.getElementById('updateDateTime').textContent = `Data terakhir dimuat pada ${formattedDate}`;
+  }
+  
   dataPromise.then(data => {
     if (data.length === 0) return;
     
