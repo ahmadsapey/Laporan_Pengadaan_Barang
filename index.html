@@ -324,9 +324,10 @@ document.addEventListener('DOMContentLoaded', function() {
     modal.show();
   });
 
-  // Upload form submit
+  // Upload form submit - Upload ke backend
   document.getElementById('uploadForm').addEventListener('submit', function(e) {
     e.preventDefault();
+    
     const fileInput = document.getElementById('jsonFile');
     const file = fileInput.files[0];
     if (!file) {
@@ -334,31 +335,53 @@ document.addEventListener('DOMContentLoaded', function() {
       document.getElementById('uploadError').style.display = 'block';
       return;
     }
-    const reader = new FileReader();
-    reader.onload = function(event) {
-      try {
-        const jsonData = JSON.parse(event.target.result);
-        // Validasi format JSON (harus array)
-        if (!Array.isArray(jsonData)) {
-          throw new Error('File harus berisi array JSON!');
-        }
-        // Simpan ke localStorage dengan timestamp dan admin name
-        const adminName = currentUser ? currentUser.name : 'Administrator';
-        localStorage.setItem('uploadedData', JSON.stringify(jsonData));
-        localStorage.setItem('uploadedTime', new Date().toISOString());
-        localStorage.setItem('uploadedBy', adminName);
-        document.getElementById('uploadSuccess').textContent = 'File berhasil diupload! Data akan ditampilkan di dashboard.';
+    
+    // Show loading state
+    const submitBtn = document.querySelector('#uploadForm button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Uploading...';
+    
+    // Prepare FormData untuk submit ke server
+    const formData = new FormData();
+    formData.append('jsonFile', file);
+    formData.append('adminName', currentUser ? currentUser.name : 'Administrator');
+    
+    // Upload ke backend
+    fetch('upload.php', {
+      method: 'POST',
+      body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+      if (data.success) {
+        // Clear localStorage to force fresh load dari server
+        localStorage.removeItem('uploadedData');
+        localStorage.removeItem('uploadedTime');
+        localStorage.removeItem('uploadedBy');
+        
+        // Save metadata dari server response
+        localStorage.setItem('uploadedTime', data.data.uploadedTime);
+        localStorage.setItem('uploadedBy', data.data.uploadedBy);
+        
+        document.getElementById('uploadSuccess').textContent = `✅ ${data.message} (${data.data.totalRecords} records)`;
         document.getElementById('uploadSuccess').style.display = 'block';
-        // Reload page setelah 2 detik
+        document.getElementById('uploadError').style.display = 'none';
+        
+        // Reload page setelah 2 detik untuk fetch data terbaru dari server
         setTimeout(() => {
           location.reload();
         }, 2000);
-      } catch (err) {
-        document.getElementById('uploadError').textContent = 'Error: ' + err.message;
-        document.getElementById('uploadError').style.display = 'block';
+      } else {
+        throw new Error(data.message || 'Upload gagal');
       }
-    };
-    reader.readAsText(file);
+    })
+    .catch(err => {
+      document.getElementById('uploadError').textContent = 'Error: ' + err.message;
+      document.getElementById('uploadError').style.display = 'block';
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalText;
+    });
   });
 
   // Login form submit
@@ -386,26 +409,31 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function loadTableData() {
-  // Cek apakah ada data yang diupload, jika ada gunakan itu, jika tidak gunakan data_monitoring.json
+  // Fetch data dari server (data_monitoring.json) - selalu fresh dari server
   let dataPromise;
-  const uploadedData = localStorage.getItem('uploadedData');
-  const uploadedTime = localStorage.getItem('uploadedTime');
-  const uploadedBy = localStorage.getItem('uploadedBy');
   
-  if (uploadedData) {
-    dataPromise = Promise.resolve(JSON.parse(uploadedData));
-  } else {
-    dataPromise = fetch('data_monitoring.json').then(response => response.json()).catch(err => {
+  // Add cache busting untuk memastikan fresh load
+  const timestamp = new Date().getTime();
+  dataPromise = fetch(`data_monitoring.json?t=${timestamp}`)
+    .then(response => {
+      if (!response.ok) {
+        throw new Error('Gagal load data dari server');
+      }
+      return response.json();
+    })
+    .catch(err => {
       console.error('Error loading data:', err);
       return [];
     });
-  }
   
-  // Update tanggal update data - gunakan format ISO untuk konsistensi across devices
+  // Get metadata dari localStorage (untuk display info)
+  const uploadedTime = localStorage.getItem('uploadedTime');
+  const uploadedBy = localStorage.getItem('uploadedBy');
+  
+  // Update tanggal update data
   const updateDateTimeElement = document.getElementById('updateDateTime');
   if (uploadedTime && uploadedBy) {
     try {
-      // Parse ISO string dan convert ke local timezone
       const updateDate = new Date(uploadedTime);
       const options = {
         weekday: 'long',
@@ -420,22 +448,10 @@ function loadTableData() {
       const localDateStr = new Intl.DateTimeFormat('id-ID', options).format(updateDate);
       updateDateTimeElement.textContent = `📅 Data diupdate oleh ${uploadedBy} pada: ${localDateStr}`;
     } catch(e) {
-      updateDateTimeElement.textContent = 'Data terakhir diupdate: -';
+      updateDateTimeElement.textContent = '📅 Data terakhir diupdate: -';
     }
   } else {
-    // Format tanggal loading untuk default data
-    const options = {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      timeZoneName: 'short'
-    };
-    const localDateStr = new Intl.DateTimeFormat('id-ID', options).format(new Date());
-    updateDateTimeElement.textContent = `📅 Data default dimuat pada: ${localDateStr}`;
+    updateDateTimeElement.textContent = '📅 Data siap ditampilkan';
   }
   
   dataPromise.then(data => {
