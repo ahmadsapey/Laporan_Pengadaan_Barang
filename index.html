@@ -324,7 +324,7 @@ document.addEventListener('DOMContentLoaded', function() {
     modal.show();
   });
 
-  // Upload form submit - Client side processing, embed metadata dalam JSON
+  // Upload form submit - Simpan file JSON ke localStorage
   document.getElementById('uploadForm').addEventListener('submit', function(e) {
     e.preventDefault();
     
@@ -341,7 +341,7 @@ document.addEventListener('DOMContentLoaded', function() {
       try {
         let jsonData = JSON.parse(event.target.result);
         
-        // Validasi format JSON (harus array)
+        // Validasi format JSON
         if (!Array.isArray(jsonData)) {
           throw new Error('File harus berisi array JSON!');
         }
@@ -350,8 +350,8 @@ document.addEventListener('DOMContentLoaded', function() {
           throw new Error('File kosong atau tidak ada data!');
         }
         
-        // Tambahkan metadata ke file
-        const metadata = {
+        // Embed metadata ke dalam data
+        const dataWithMetadata = {
           _metadata: {
             uploadedBy: currentUser ? currentUser.name : 'Administrator',
             uploadedAt: new Date().toISOString(),
@@ -361,33 +361,37 @@ document.addEventListener('DOMContentLoaded', function() {
           data: jsonData
         };
         
-        // Generate download file dengan struktur baru
-        const jsonString = JSON.stringify(metadata, null, 2);
-        const blob = new Blob([jsonString], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const downloadLink = document.createElement('a');
-        downloadLink.href = url;
-        downloadLink.download = 'data_monitoring.json';
+        // Simpan ke localStorage
+        localStorage.setItem('dashboardData', JSON.stringify(dataWithMetadata));
+        localStorage.setItem('dataUpdateTime', new Date().toISOString());
         
-        // Show download instruction
-        const downloadBtn = document.createElement('button');
-        downloadBtn.type = 'button';
-        downloadBtn.className = 'btn btn-primary w-100 mt-2';
-        downloadBtn.textContent = '⬇️ Download File JSON (Langkah 1)';
-        downloadBtn.onclick = function() {
-          downloadLink.click();
-        };
+        // Generate JSON string untuk di-copy
+        const jsonString = JSON.stringify(dataWithMetadata, null, 2);
         
-        const copyText = document.createElement('p');
-        copyText.className = 'text-muted mt-3 mb-2 text-center';
-        copyText.innerHTML = `<small><strong>Langkah 2:</strong> Buka folder dashboard Anda → Ganti file <code>data_monitoring.json</code> dengan file yang sudah didownload<br><strong>Langkah 3:</strong> Refresh dashboard di semua device, data akan sinkron otomatis ✨</small>`;
-        
+        // Buat button untuk copy
         const successDiv = document.getElementById('uploadSuccess');
-        successDiv.innerHTML = `✅ File siap! Metadata sudah ditambahkan (${jsonData.length} records dari ${currentUser ? currentUser.name : 'Admin'})`;
+        successDiv.innerHTML = `
+          <div class="alert alert-success mb-2">
+            ✅ File berhasil diupload! (${jsonData.length} records)
+          </div>
+          <p class="text-muted mb-3">
+            <small>
+              <strong>📋 Instruksi Sinkronisasi:</strong><br>
+              1️⃣ Klik tombol "Copy JSON di bawah" untuk copy ke clipboard<br>
+              2️⃣ Login ke Vacel/hosting Anda<br>
+              3️⃣ Buka file <code>data_monitoring.json</code> → Paste isi yang sudah dicopy<br>
+              4️⃣ Save file, kemudian semua device refresh untuk melihat data terbaru ✨
+            </small>
+          </p>
+          <textarea id="jsonOutput" class="form-control mb-2" rows="6" readonly style="font-size: 11px; font-family: monospace;">${jsonString}</textarea>
+          <button type="button" class="btn btn-success w-100 mb-2" onclick="copyToClipboard()">
+            📋 Copy JSON to Clipboard
+          </button>
+          <button type="button" class="btn btn-primary w-100 mb-2" onclick="downloadJSON()">
+            ⬇️ Download JSON File
+          </button>
+        `;
         successDiv.style.display = 'block';
-        successDiv.appendChild(downloadBtn);
-        successDiv.appendChild(copyText);
-        
         document.getElementById('uploadError').style.display = 'none';
         
       } catch (err) {
@@ -397,6 +401,25 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     reader.readAsText(file);
   });
+
+  // Fungsi copy ke clipboard
+  window.copyToClipboard = function() {
+    const textarea = document.getElementById('jsonOutput');
+    textarea.select();
+    document.execCommand('copy');
+    alert('✅ JSON copied to clipboard! Paste di file data_monitoring.json Anda');
+  };
+  
+  // Fungsi download JSON
+  window.downloadJSON = function() {
+    const textarea = document.getElementById('jsonOutput');
+    const blob = new Blob([textarea.value], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const downloadLink = document.createElement('a');
+    downloadLink.href = url;
+    downloadLink.download = 'data_monitoring.json';
+    downloadLink.click();
+  };
 
   // Login form submit
   document.getElementById('loginForm').addEventListener('submit', function(e) {
@@ -423,37 +446,48 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function loadTableData() {
-  // Fetch data dari data_monitoring.json - bisa format baru (dengan metadata) atau legacy (array)
-  const timestamp = new Date().getTime();
-  const dataPromise = fetch(`data_monitoring.json?t=${timestamp}`)
-    .then(response => {
-      if (!response.ok) throw new Error('Gagal load data');
-      return response.json();
-    })
-    .catch(err => {
-      console.error('Error loading data:', err);
-      return { data: [], _metadata: null };
-    });
+  // Priority: 1. localStorage (uploaded data), 2. data_monitoring.json (default)
+  let dataPromise;
+  const localStorageData = localStorage.getItem('dashboardData');
   
-  // Update tanggal update data berdasarkan metadata dari JSON
+  if (localStorageData) {
+    // Load dari localStorage
+    try {
+      dataPromise = Promise.resolve(JSON.parse(localStorageData));
+    } catch(e) {
+      // Fallback ke file jika localStorage corrupt
+      dataPromise = fetch(`data_monitoring.json?t=${new Date().getTime()}`)
+        .then(r => r.json())
+        .catch(() => ({}));
+    }
+  } else {
+    // Load dari file default
+    dataPromise = fetch(`data_monitoring.json?t=${new Date().getTime()}`)
+      .then(response => response.json())
+      .catch(err => {
+        console.error('Error loading data:', err);
+        return {};
+      });
+  }
+  
+  // Update tanggal update data
   const updateDateTimeElement = document.getElementById('updateDateTime');
   
   dataPromise.then(responseData => {
-    // Parse structure - bisa format baru atau legacy
     let data = [];
     let metadata = null;
     
+    // Parse data - bisa format baru (dengan _metadata) atau lama (array)
     if (Array.isArray(responseData)) {
-      // Format lama: array biasa
       data = responseData;
-      metadata = null;
     } else if (responseData._metadata && Array.isArray(responseData.data)) {
-      // Format baru: dengan metadata
       metadata = responseData._metadata;
       data = responseData.data;
+    } else if (Array.isArray(responseData)) {
+      data = responseData;
     }
     
-    // Display metadata jika ada
+    // Display metadata
     if (metadata) {
       try {
         const updateDate = new Date(metadata.uploadedAt);
@@ -476,7 +510,10 @@ function loadTableData() {
       updateDateTimeElement.textContent = '📅 Data siap ditampilkan';
     }
     
-    if (data.length === 0) return;
+    if (data.length === 0) {
+      document.querySelector('#monitoringTable tbody').innerHTML = '<tr><td colspan="7" class="text-center text-muted">Tidak ada data</td></tr>';
+      return;
+    }
     if (data.length === 0) return;
     
     // Destroy previous datatable instance jika ada
