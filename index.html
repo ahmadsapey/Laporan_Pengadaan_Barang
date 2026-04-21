@@ -57,9 +57,22 @@
     </style>
 </head>
 <body>
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+  <div class="container-fluid">
+    <a class="navbar-brand fw-bold" href="#">Dashboard</a>
+    <div class="d-flex ms-auto align-items-center gap-2">
+      <span id="navbar-username" class="me-2 d-none"></span>
+      <button id="uploadBtn" class="btn btn-outline-success btn-sm d-none">Upload File</button>
+      <button id="loginBtn" class="btn btn-outline-primary btn-sm">Login</button>
+      <button id="logoutBtn" class="btn btn-outline-danger btn-sm d-none ms-2">Logout</button>
+    </div>
+  </div>
+</nav>
+
 <div class="container py-4">
     <h2 class="mb-4 text-center">Dashboard Monitoring Pengadaan Barang</h2>
-    <div class="table-responsive">
+    <div id="tableContainer" class="table-responsive">
         <table id="monitoringTable" class="table table-bordered table-hover align-middle modern-table text-center" style="table-layout: fixed; width: 100%;">
             <thead class="table-header-navy">
             <tr>
@@ -79,7 +92,7 @@
     </div>
 </div>
 
-<!-- Modal -->
+<!-- Modal Detail -->
 <div class="modal fade" id="detailModal" tabindex="-1" aria-labelledby="detailModalLabel" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -88,7 +101,56 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-                <!-- Konten akan diisi oleh JS -->
+        <!-- Konten akan diisi oleh JS -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Login -->
+<div class="modal fade" id="loginModal" tabindex="-1" aria-labelledby="loginModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="loginModalLabel">Login User</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="loginForm">
+          <div class="mb-3">
+            <label for="username" class="form-label">Username</label>
+            <input type="text" class="form-control" id="username" required autocomplete="username">
+          </div>
+          <div class="mb-3">
+            <label for="password" class="form-label">Password</label>
+            <input type="password" class="form-control" id="password" required autocomplete="current-password">
+          </div>
+          <div id="loginError" class="text-danger mb-2" style="display:none;"></div>
+          <button type="submit" class="btn btn-primary w-100">Login</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Upload File -->
+<div class="modal fade" id="uploadModal" tabindex="-1" aria-labelledby="uploadModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="uploadModalLabel">Upload File JSON</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="uploadForm">
+          <div class="mb-3">
+            <label for="jsonFile" class="form-label">Pilih File JSON</label>
+            <input type="file" class="form-control" id="jsonFile" accept=".json" required>
+          </div>
+          <div id="uploadError" class="text-danger mb-2" style="display:none;"></div>
+          <div id="uploadSuccess" class="text-success mb-2" style="display:none;"></div>
+          <button type="submit" class="btn btn-success w-100">Upload</button>
+        </form>
       </div>
     </div>
   </div>
@@ -97,84 +159,215 @@
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+
 <script>
-$(document).ready(function() {
-    fetch('data_monitoring.json')
-        .then(response => response.json())
-        .then(data => {
-            let tbody = '';
-            data.forEach(function(row, idx) {
-                tbody += `<tr class="pointer" data-idx="${idx}">
-                    <td>${row.Project_Code || '-'}</td>
-                    <td>${row.Project_Name || '-'}</td>
-                    <td>${row.PR_No || '-'}</td>
-                    <td>${row.PO_No || '-'}</td>
-                    <td>${row.PR_Date || '-'}</td>
-                    <td>${row.PR_Status || '-'}</td>
-                    <td>${row.PO_Payment || '-'}</td>
-                </tr>`;
-            });
-            document.querySelector('#monitoringTable tbody').innerHTML = tbody;
-            let table = $('#monitoringTable').DataTable({
-                responsive: true,
-                language: {
-                    search: "Cari:",
-                    lengthMenu: "Tampilkan _MENU_ entri",
-                    info: "Menampilkan _START_ sampai _END_ dari _TOTAL_ entri",
-                    paginate: {
-                        first: "Pertama",
-                        last: "Terakhir",
-                        next: "Berikutnya",
-                        previous: "Sebelumnya"
-                    }
-                }
-            });
-            $('#monitoringTable tbody').on('click', 'tr', function() {
-                let idx = $(this).data('idx');
-                let detail = data[idx];
-                const labelMap = {
-                    Project_Code: 'Project Code',
-                    Project_Name: 'Project Name',
-                    PR_No: 'Purchase Request No',
-                    PO_No: 'PO No',
-                    PR_Date: 'PR Date',
-                    Delivery_Date: 'Delivery Date',
-                    PO_Date: 'PO Date',
-                    Request_Delivery: 'Req Delivery',
-                    Item_Name: 'Item Name',
-                    Quantity: 'Total Purchase Order Qty',
-                    Invoicing_Status: 'Invoicing Status',
-                    Leadtime_PR_PO: 'ACT SPB TO REQUEST',
-                    Leadtime_PO_Deliv: 'STD LEADTIME PCH',
-                    ETA: 'ETA',
-                    Remark: 'ACT LEADTIME TO ETA',
-                    Act_Request_to_PO: 'SCORING SPB',
-                    Act_PR_to_Request: 'SCORING LEAD TIME',
-                    PR_Status: 'PR Status',
-                    PO_Payment: 'PO Payment'
-                };
-                let fields = [];
-                for (const key of Object.keys(labelMap)) {
-                    if (detail.hasOwnProperty(key)) {
-                        fields.push({label: labelMap[key], value: detail[key] || '-'});
-                    }
-                }
-                let leftCol = '', rightCol = '';
-                fields.forEach(function(field, i) {
-                    let html = `<div class=\"mb-2\"><strong>${field.label}:</strong> <span>${field.value}</span></div>`;
-                    if (i % 2 === 0) leftCol += html;
-                    else rightCol += html;
-                });
-                let gridHtml = `<div class=\"row\">
-                    <div class=\"col-md-6\">${leftCol}</div>
-                    <div class=\"col-md-6\">${rightCol}</div>
-                </div>`;
-                $('.modal-body').html(gridHtml);
-                var modal = new bootstrap.Modal(document.getElementById('detailModal'));
-                modal.show();
-            });
-        });
+// --- LOGIN LOGIC ---
+// Daftar user statis
+const users = [
+  { username: 'admin', password: '123456', name: 'Administrator', role: 'admin' },
+];
+let currentUser = null;
+
+function updateNavbar() {
+  const usernameSpan = document.getElementById('navbar-username');
+  const loginBtn = document.getElementById('loginBtn');
+  const logoutBtn = document.getElementById('logoutBtn');
+  const uploadBtn = document.getElementById('uploadBtn');
+  if (currentUser) {
+    usernameSpan.textContent = currentUser.name + ' (' + currentUser.role + ')';
+    usernameSpan.classList.remove('d-none');
+    loginBtn.classList.add('d-none');
+    logoutBtn.classList.remove('d-none');
+    // Tampilkan upload button hanya untuk admin
+    if (currentUser.role === 'admin') {
+      uploadBtn.classList.remove('d-none');
+    } else {
+      uploadBtn.classList.add('d-none');
+    }
+  } else {
+    usernameSpan.textContent = '';
+    usernameSpan.classList.add('d-none');
+    loginBtn.classList.remove('d-none');
+    logoutBtn.classList.add('d-none');
+    uploadBtn.classList.add('d-none');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  // Navbar login button
+  document.getElementById('loginBtn').addEventListener('click', function() {
+    document.getElementById('loginForm').reset();
+    document.getElementById('loginError').style.display = 'none';
+    var modal = new bootstrap.Modal(document.getElementById('loginModal'));
+    modal.show();
+  });
+
+  // Navbar logout button
+  document.getElementById('logoutBtn').addEventListener('click', function() {
+    currentUser = null;
+    updateNavbar();
+  });
+
+  // Navbar upload button (admin only)
+  document.getElementById('uploadBtn').addEventListener('click', function() {
+    document.getElementById('uploadForm').reset();
+    document.getElementById('uploadError').style.display = 'none';
+    document.getElementById('uploadSuccess').style.display = 'none';
+    var modal = new bootstrap.Modal(document.getElementById('uploadModal'));
+    modal.show();
+  });
+
+  // Upload form submit
+  document.getElementById('uploadForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const fileInput = document.getElementById('jsonFile');
+    const file = fileInput.files[0];
+    if (!file) {
+      document.getElementById('uploadError').textContent = 'Pilih file terlebih dahulu!';
+      document.getElementById('uploadError').style.display = 'block';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = function(event) {
+      try {
+        const jsonData = JSON.parse(event.target.result);
+        // Validasi format JSON (harus array)
+        if (!Array.isArray(jsonData)) {
+          throw new Error('File harus berisi array JSON!');
+        }
+        // Simpan ke localStorage
+        localStorage.setItem('uploadedData', JSON.stringify(jsonData));
+        document.getElementById('uploadSuccess').textContent = 'File berhasil diupload! Data akan ditampilkan di dashboard.';
+        document.getElementById('uploadSuccess').style.display = 'block';
+        // Reload page setelah 2 detik
+        setTimeout(() => {
+          location.reload();
+        }, 2000);
+      } catch (err) {
+        document.getElementById('uploadError').textContent = 'Error: ' + err.message;
+        document.getElementById('uploadError').style.display = 'block';
+      }
+    };
+    reader.readAsText(file);
+  });
+
+  // Login form submit
+  document.getElementById('loginForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+    const user = users.find(u => u.username === username && u.password === password);
+    if (user) {
+      currentUser = user;
+      updateNavbar();
+      var modalEl = document.getElementById('loginModal');
+      var modal = bootstrap.Modal.getInstance(modalEl);
+      modal.hide();
+    } else {
+      document.getElementById('loginError').textContent = 'Username atau password salah!';
+      document.getElementById('loginError').style.display = 'block';
+    }
+  });
+
+  updateNavbar();
+
+  // Load data table saat pertama kali
+  loadTableData();
 });
+
+function loadTableData() {
+  // Cek apakah ada data yang diupload, jika ada gunakan itu, jika tidak gunakan data_monitoring.json
+  let dataPromise;
+  const uploadedData = localStorage.getItem('uploadedData');
+  if (uploadedData) {
+    dataPromise = Promise.resolve(JSON.parse(uploadedData));
+  } else {
+    dataPromise = fetch('data_monitoring.json').then(response => response.json()).catch(err => {
+      console.error('Error loading data:', err);
+      return [];
+    });
+  }
+  dataPromise.then(data => {
+    if (data.length === 0) return;
+    
+    // Destroy previous datatable instance jika ada
+    if ($.fn.DataTable.isDataTable('#monitoringTable')) {
+      $('#monitoringTable').DataTable().destroy();
+    }
+    
+    let tbody = '';
+    data.forEach(function(row, idx) {
+      tbody += `<tr class="pointer" data-idx="${idx}">
+        <td>${row.Project_Code || '-'}</td>
+        <td>${row.Project_Name || '-'}</td>
+        <td>${row.PR_No || '-'}</td>
+        <td>${row.PO_No || '-'}</td>
+        <td>${row.PR_Date || '-'}</td>
+        <td>${row.PR_Status || '-'}</td>
+        <td>${row.PO_Payment || '-'}</td>
+      </tr>`;
+    });
+    document.querySelector('#monitoringTable tbody').innerHTML = tbody;
+
+    let table = $('#monitoringTable').DataTable({
+      responsive: true,
+      language: {
+        search: "Cari:",
+        lengthMenu: "Tampilkan _MENU_ entri",
+        info: "Menampilkan _START_ sampai _END_ dari _TOTAL_ entri",
+        paginate: {
+          first: "Pertama",
+          last: "Terakhir",
+          next: "Berikutnya",
+          previous: "Sebelumnya"
+        }
+      }
+    });
+
+    $('#monitoringTable tbody').on('click', 'tr', function() {
+      let idx = $(this).data('idx');
+      let detail = data[idx];
+      const labelMap = {
+        Project_Code: 'Project Code',
+        Project_Name: 'Project Name',
+        PR_No: 'Purchase Request No',
+        PO_No: 'PO No',
+        PR_Date: 'PR Date',
+        Delivery_Date: 'Delivery Date',
+        PO_Date: 'PO Date',
+        Request_Delivery: 'Req Delivery',
+        Item_Name: 'Item Name',
+        Quantity: 'Total Purchase Order Qty',
+        Invoicing_Status: 'Invoicing Status',
+        Leadtime_PR_PO: 'ACT SPB TO REQUEST',
+        Leadtime_PO_Deliv: 'STD LEADTIME PCH',
+        ETA: 'ETA',
+        Remark: 'ACT LEADTIME TO ETA',
+        Act_Request_to_PO: 'SCORING SPB',
+        Act_PR_to_Request: 'SCORING LEAD TIME',
+        PR_Status: 'PR Status',
+        PO_Payment: 'PO Payment'
+      };
+      let fields = [];
+      for (const key of Object.keys(labelMap)) {
+        if (detail.hasOwnProperty(key)) {
+          fields.push({label: labelMap[key], value: detail[key] || '-'});
+        }
+      }
+      let leftCol = '', rightCol = '';
+      fields.forEach(function(field, i) {
+        let html = `<div class="mb-2"><strong>${field.label}:</strong> <span>${field.value}</span></div>`;
+        if (i % 2 === 0) leftCol += html;
+        else rightCol += html;
+      });
+      let gridHtml = `<div class="row">
+        <div class="col-md-6">${leftCol}</div>
+        <div class="col-md-6">${rightCol}</div>
+      </div>`;
+      $('.modal-body').html(gridHtml);
+      var modal = new bootstrap.Modal(document.getElementById('detailModal'));
+      modal.show();
+    });
+  });
+}
 </script>
-</body>
-</html>
