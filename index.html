@@ -268,6 +268,11 @@
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 
 <script>
+// Force clear localStorage untuk menghindari cache data lama
+// Uncomment jika ingin force clear saat load
+// localStorage.removeItem('uploadedData');
+// localStorage.removeItem('uploadedTime');
+// localStorage.removeItem('uploadedBy');
 // --- LOGIN LOGIC ---
 // Daftar user statis
 const users = [
@@ -400,7 +405,7 @@ function loadTableData() {
   if (uploadedData) {
     dataPromise = Promise.resolve(JSON.parse(uploadedData));
   } else {
-    dataPromise = fetch('data_monitoring.json').then(response => response.json()).catch(err => {
+    dataPromise = fetch('data_monitoring.json?t=' + new Date().getTime()).then(response => response.json()).catch(err => {
       console.error('Error loading data:', err);
       return [];
     });
@@ -565,6 +570,14 @@ function loadTableData() {
       });
 
       const totalPOPayment = projectData.length;
+
+      // Debug log untuk memastikan data benar
+      console.log('DEBUG renderProjectChart:', {
+        projectCode: projectCode,
+        totalData: projectData.length,
+        statusCount: statusCount,
+        data: projectData.slice(0, 5)
+      });
 
       // Destroy existing chart jika ada
       if (chartInstance) {
