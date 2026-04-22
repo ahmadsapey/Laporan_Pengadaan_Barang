@@ -534,9 +534,8 @@ function loadTableData() {
         return;
       }
 
-      // Hitung jumlah unique PR_No di project ini
-      const uniquePRs = new Set(projectData.map(item => item.PR_No));
-      const totalPRs = uniquePRs.size;
+      // Hitung jumlah PR_No berdasarkan total baris data (tidak unique, karena 1 PR bisa punya multiple PO)
+      const totalPRs = projectData.length;
 
       // Hitung status berdasarkan PO_Payment
       let statusCount = {
