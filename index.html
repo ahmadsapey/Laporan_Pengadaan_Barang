@@ -147,6 +147,7 @@
     <div class="d-flex ms-auto align-items-center gap-2">
       <span id="navbar-username" class="me-2 d-none"></span>
       <button id="uploadBtn" class="btn btn-outline-success btn-sm d-none">Upload File</button>
+      <button id="clearCacheBtn" class="btn btn-outline-warning btn-sm d-none" title="Clear localStorage cache">Clear Cache</button>
       <button id="loginBtn" class="btn btn-outline-primary btn-sm">Login</button>
       <button id="logoutBtn" class="btn btn-outline-danger btn-sm d-none ms-2">Logout</button>
     </div>
@@ -285,11 +286,13 @@ function updateNavbar() {
   const loginBtn = document.getElementById('loginBtn');
   const logoutBtn = document.getElementById('logoutBtn');
   const uploadBtn = document.getElementById('uploadBtn');
+  const clearCacheBtn = document.getElementById('clearCacheBtn');
   if (currentUser) {
     usernameSpan.textContent = currentUser.name + ' (' + currentUser.role + ')';
     usernameSpan.classList.remove('d-none');
     loginBtn.classList.add('d-none');
     logoutBtn.classList.remove('d-none');
+    clearCacheBtn.classList.remove('d-none');
     // Tampilkan upload button hanya untuk admin
     if (currentUser.role === 'admin') {
       uploadBtn.classList.remove('d-none');
@@ -302,6 +305,7 @@ function updateNavbar() {
     loginBtn.classList.remove('d-none');
     logoutBtn.classList.add('d-none');
     uploadBtn.classList.add('d-none');
+    clearCacheBtn.classList.add('d-none');
   }
 }
 
@@ -316,8 +320,24 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Navbar logout button
   document.getElementById('logoutBtn').addEventListener('click', function() {
+    // Auto clear cache saat logout
+    localStorage.removeItem('uploadedData');
+    localStorage.removeItem('uploadedTime');
+    localStorage.removeItem('uploadedBy');
     currentUser = null;
     updateNavbar();
+    alert('Logged out. Cache cleared.');
+  });
+
+  // Navbar clear cache button
+  document.getElementById('clearCacheBtn').addEventListener('click', function() {
+    if (confirm('Clear localStorage cache? Data akan di-load ulang dari file.')) {
+      localStorage.removeItem('uploadedData');
+      localStorage.removeItem('uploadedTime');
+      localStorage.removeItem('uploadedBy');
+      alert('Cache cleared! Reloading page...');
+      location.reload();
+    }
   });
 
   // Navbar upload button (admin only)
@@ -449,7 +469,11 @@ function loadTableData() {
   }
   
   dataPromise.then(data => {
-    if (data.length === 0) return;
+    if (data.length === 0) {
+      document.querySelector('#monitoringTable tbody').innerHTML = '<tr><td colspan="7" class="text-center text-muted py-5">Tidak ada data. Mohon upload file JSON terlebih dahulu.</td></tr>';
+      document.getElementById('updateDateTime').textContent = 'ℹ️ Data kosong - silakan upload file';
+      return;
+    }
     
     // Destroy previous datatable instance jika ada
     if ($.fn.DataTable.isDataTable('#monitoringTable')) {
