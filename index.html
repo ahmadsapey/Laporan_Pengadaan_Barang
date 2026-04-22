@@ -324,10 +324,9 @@ document.addEventListener('DOMContentLoaded', function() {
     modal.show();
   });
 
-  // Upload form submit - Simpan file JSON ke localStorage
+  // Upload form submit
   document.getElementById('uploadForm').addEventListener('submit', function(e) {
     e.preventDefault();
-    
     const fileInput = document.getElementById('jsonFile');
     const file = fileInput.files[0];
     if (!file) {
@@ -335,65 +334,25 @@ document.addEventListener('DOMContentLoaded', function() {
       document.getElementById('uploadError').style.display = 'block';
       return;
     }
-    
     const reader = new FileReader();
     reader.onload = function(event) {
       try {
-        let jsonData = JSON.parse(event.target.result);
-        
-        // Validasi format JSON
+        const jsonData = JSON.parse(event.target.result);
+        // Validasi format JSON (harus array)
         if (!Array.isArray(jsonData)) {
           throw new Error('File harus berisi array JSON!');
         }
-        
-        if (jsonData.length === 0) {
-          throw new Error('File kosong atau tidak ada data!');
-        }
-        
-        // Embed metadata ke dalam data
-        const dataWithMetadata = {
-          _metadata: {
-            uploadedBy: currentUser ? currentUser.name : 'Administrator',
-            uploadedAt: new Date().toISOString(),
-            totalRecords: jsonData.length,
-            version: '1.0'
-          },
-          data: jsonData
-        };
-        
-        // Simpan ke localStorage
-        localStorage.setItem('dashboardData', JSON.stringify(dataWithMetadata));
-        localStorage.setItem('dataUpdateTime', new Date().toISOString());
-        
-        // Generate JSON string untuk di-copy
-        const jsonString = JSON.stringify(dataWithMetadata, null, 2);
-        
-        // Buat button untuk copy
-        const successDiv = document.getElementById('uploadSuccess');
-        successDiv.innerHTML = `
-          <div class="alert alert-success mb-2">
-            ✅ File berhasil diupload! (${jsonData.length} records)
-          </div>
-          <p class="text-muted mb-3">
-            <small>
-              <strong>📋 Instruksi Sinkronisasi:</strong><br>
-              1️⃣ Klik tombol "Copy JSON di bawah" untuk copy ke clipboard<br>
-              2️⃣ Login ke Vacel/hosting Anda<br>
-              3️⃣ Buka file <code>data_monitoring.json</code> → Paste isi yang sudah dicopy<br>
-              4️⃣ Save file, kemudian semua device refresh untuk melihat data terbaru ✨
-            </small>
-          </p>
-          <textarea id="jsonOutput" class="form-control mb-2" rows="6" readonly style="font-size: 11px; font-family: monospace;">${jsonString}</textarea>
-          <button type="button" class="btn btn-success w-100 mb-2" onclick="copyToClipboard()">
-            📋 Copy JSON to Clipboard
-          </button>
-          <button type="button" class="btn btn-primary w-100 mb-2" onclick="downloadJSON()">
-            ⬇️ Download JSON File
-          </button>
-        `;
-        successDiv.style.display = 'block';
-        document.getElementById('uploadError').style.display = 'none';
-        
+        // Simpan ke localStorage dengan timestamp dan admin name
+        const adminName = currentUser ? currentUser.name : 'Administrator';
+        localStorage.setItem('uploadedData', JSON.stringify(jsonData));
+        localStorage.setItem('uploadedTime', new Date().toISOString());
+        localStorage.setItem('uploadedBy', adminName);
+        document.getElementById('uploadSuccess').textContent = 'File berhasil diupload! Data akan ditampilkan di dashboard.';
+        document.getElementById('uploadSuccess').style.display = 'block';
+        // Reload page setelah 2 detik
+        setTimeout(() => {
+          location.reload();
+        }, 2000);
       } catch (err) {
         document.getElementById('uploadError').textContent = 'Error: ' + err.message;
         document.getElementById('uploadError').style.display = 'block';
@@ -401,25 +360,6 @@ document.addEventListener('DOMContentLoaded', function() {
     };
     reader.readAsText(file);
   });
-
-  // Fungsi copy ke clipboard
-  window.copyToClipboard = function() {
-    const textarea = document.getElementById('jsonOutput');
-    textarea.select();
-    document.execCommand('copy');
-    alert('✅ JSON copied to clipboard! Paste di file data_monitoring.json Anda');
-  };
-  
-  // Fungsi download JSON
-  window.downloadJSON = function() {
-    const textarea = document.getElementById('jsonOutput');
-    const blob = new Blob([textarea.value], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const downloadLink = document.createElement('a');
-    downloadLink.href = url;
-    downloadLink.download = 'data_monitoring.json';
-    downloadLink.click();
-  };
 
   // Login form submit
   document.getElementById('loginForm').addEventListener('submit', function(e) {
@@ -446,74 +386,59 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function loadTableData() {
-  // Priority: 1. localStorage (uploaded data), 2. data_monitoring.json (default)
+  // Cek apakah ada data yang diupload, jika ada gunakan itu, jika tidak gunakan data_monitoring.json
   let dataPromise;
-  const localStorageData = localStorage.getItem('dashboardData');
+  const uploadedData = localStorage.getItem('uploadedData');
+  const uploadedTime = localStorage.getItem('uploadedTime');
+  const uploadedBy = localStorage.getItem('uploadedBy');
   
-  if (localStorageData) {
-    // Load dari localStorage
-    try {
-      dataPromise = Promise.resolve(JSON.parse(localStorageData));
-    } catch(e) {
-      // Fallback ke file jika localStorage corrupt
-      dataPromise = fetch(`data_monitoring.json?t=${new Date().getTime()}`)
-        .then(r => r.json())
-        .catch(() => ({}));
-    }
+  if (uploadedData) {
+    dataPromise = Promise.resolve(JSON.parse(uploadedData));
   } else {
-    // Load dari file default
-    dataPromise = fetch(`data_monitoring.json?t=${new Date().getTime()}`)
-      .then(response => response.json())
-      .catch(err => {
-        console.error('Error loading data:', err);
-        return {};
-      });
+    dataPromise = fetch('data_monitoring.json').then(response => response.json()).catch(err => {
+      console.error('Error loading data:', err);
+      return [];
+    });
   }
   
-  // Update tanggal update data
+  // Update tanggal update data - gunakan format ISO untuk konsistensi across devices
   const updateDateTimeElement = document.getElementById('updateDateTime');
+  if (uploadedTime && uploadedBy) {
+    try {
+      // Parse ISO string dan convert ke local timezone
+      const updateDate = new Date(uploadedTime);
+      const options = {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        timeZoneName: 'short'
+      };
+      const localDateStr = new Intl.DateTimeFormat('id-ID', options).format(updateDate);
+      updateDateTimeElement.textContent = `📅 Data diupdate oleh ${uploadedBy} pada: ${localDateStr}`;
+    } catch(e) {
+      updateDateTimeElement.textContent = 'Data terakhir diupdate: -';
+    }
+  } else {
+    // Format tanggal loading untuk default data
+    const options = {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      timeZoneName: 'short'
+    };
+    const localDateStr = new Intl.DateTimeFormat('id-ID', options).format(new Date());
+    updateDateTimeElement.textContent = `📅 Data default dimuat pada: ${localDateStr}`;
+  }
   
-  dataPromise.then(responseData => {
-    let data = [];
-    let metadata = null;
-    
-    // Parse data - bisa format baru (dengan _metadata) atau lama (array)
-    if (Array.isArray(responseData)) {
-      data = responseData;
-    } else if (responseData._metadata && Array.isArray(responseData.data)) {
-      metadata = responseData._metadata;
-      data = responseData.data;
-    } else if (Array.isArray(responseData)) {
-      data = responseData;
-    }
-    
-    // Display metadata
-    if (metadata) {
-      try {
-        const updateDate = new Date(metadata.uploadedAt);
-        const options = {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-          timeZoneName: 'short'
-        };
-        const localDateStr = new Intl.DateTimeFormat('id-ID', options).format(updateDate);
-        updateDateTimeElement.textContent = `📅 Data diupdate oleh ${metadata.uploadedBy} pada: ${localDateStr}`;
-      } catch(e) {
-        updateDateTimeElement.textContent = '📅 Data siap ditampilkan';
-      }
-    } else {
-      updateDateTimeElement.textContent = '📅 Data siap ditampilkan';
-    }
-    
-    if (data.length === 0) {
-      document.querySelector('#monitoringTable tbody').innerHTML = '<tr><td colspan="7" class="text-center text-muted">Tidak ada data</td></tr>';
-      return;
-    }
+  dataPromise.then(data => {
     if (data.length === 0) return;
     
     // Destroy previous datatable instance jika ada
@@ -591,8 +516,8 @@ function loadTableData() {
       });
       document.getElementById('detailContent').innerHTML = detailHtml;
       
-      // Render pie chart untuk PR ini
-      renderPRChart(prNo, data);
+      // Render pie chart berdasarkan Project Code
+      renderProjectChart(projectCode, projectName, data);
       
       var modal = new bootstrap.Modal(document.getElementById('detailModal'));
       modal.show();
@@ -601,42 +526,38 @@ function loadTableData() {
     // --- PIE CHART LOGIC ---
     let chartInstance = null;
 
-    function renderPRChart(prNo, allData) {
-      // Filter data by PR_No (untuk semua PO dalam PR yang sama)
-      const prData = allData.filter(item => item.PR_No === prNo);
-      if (prData.length === 0) {
-        alert('No data found for PR: ' + prNo);
+    function renderProjectChart(projectCode, projectName, allData) {
+      // Filter data by Project_Code
+      const projectData = allData.filter(item => item.Project_Code === projectCode);
+      if (projectData.length === 0) {
+        alert('No data found for Project Code: ' + projectCode);
         return;
       }
 
-      // Hitung status berdasarkan unique PO_No
-      let uniquePOs = {
-        'paid': new Set(),
-        'waiting': new Set(),
-        'other': new Set()
+      // Hitung jumlah unique PR_No di project ini
+      const uniquePRs = new Set(projectData.map(item => item.PR_No));
+      const totalPRs = uniquePRs.size;
+
+      // Hitung status berdasarkan PO_Payment
+      let statusCount = {
+        'received': 0,      // Submit Payment
+        'waiting': 0,       // Waiting Payment
+        'paid': 0           // Paid
       };
 
-      prData.forEach(record => {
-        const poNo = record.PO_No || '';
+      projectData.forEach(record => {
         const poPayment = (record.PO_Payment || '').toLowerCase().trim();
         
-        if (poPayment.includes('paid')) {
-          uniquePOs['paid'].add(poNo);
+        if (poPayment.includes('submit')) {
+          statusCount['received']++;
         } else if (poPayment.includes('waiting')) {
-          uniquePOs['waiting'].add(poNo);
-        } else {
-          uniquePOs['other'].add(poNo);
+          statusCount['waiting']++;
+        } else if (poPayment.includes('paid')) {
+          statusCount['paid']++;
         }
       });
 
-      // Convert Set ke count
-      let statusCount = {
-        'paid': uniquePOs['paid'].size,
-        'waiting': uniquePOs['waiting'].size,
-        'other': uniquePOs['other'].size
-      };
-
-      const totalPOs = statusCount['paid'] + statusCount['waiting'] + statusCount['other'];
+      const totalPOPayment = statusCount['received'] + statusCount['waiting'] + statusCount['paid'];
 
       // Destroy existing chart jika ada
       if (chartInstance) {
@@ -648,13 +569,13 @@ function loadTableData() {
       chartInstance = new Chart(ctx, {
         type: 'doughnut',
         data: {
-          labels: ['Paid', 'Waiting', 'Lainnya'],
+          labels: ['Sudah Diterima PO', 'Masih dalam Proses', 'Sudah di Payment'],
           datasets: [{
-            data: [statusCount.paid, statusCount.waiting, statusCount.other],
+            data: [statusCount.received, statusCount.waiting, statusCount.paid],
             backgroundColor: [
-              '#28a745', // Paid - Green
-              '#ffc107', // Waiting - Yellow
-              '#6c757d'  // Other - Gray
+              '#ffc107', // Received - Yellow
+              '#dc3545', // Waiting - Red
+              '#28a745'  // Paid - Green
             ],
             borderColor: [
               '#fff',
@@ -695,16 +616,23 @@ function loadTableData() {
       // Update stats
       const statsHtml = `
         <div class="mb-2">
-          <small class="d-block"><span class="badge badge-payment">Payment</span>${statusCount.paid}</small>
+          <small class="d-block"><strong>Project Code:</strong> ${projectCode}</small>
         </div>
         <div class="mb-2">
-          <small class="d-block"><span class="badge badge-po-receipt">Waiting</span>${statusCount.waiting}</small>
-        </div>
-        <div class="mb-2">
-          <small class="d-block"><span class="badge" style="background-color: #6c757d; color: #fff;">Lainnya</span>${statusCount.other}</small>
+          <small class="d-block"><strong>Total PR No:</strong> ${totalPRs}</small>
         </div>
         <hr style="margin: 8px 0;">
-        <small class="d-block text-center"><strong>Total PO Payment: ${totalPOs}</strong></small>
+        <div class="mb-2">
+          <small class="d-block"><span class="badge badge-po-receipt">Sudah Diterima</span>${statusCount.received}</small>
+        </div>
+        <div class="mb-2">
+          <small class="d-block"><span class="badge" style="background-color: #dc3545; color: #fff;">Masih Proses</span>${statusCount.waiting}</small>
+        </div>
+        <div class="mb-2">
+          <small class="d-block"><span class="badge badge-payment">Sudah Payment</span>${statusCount.paid}</small>
+        </div>
+        <hr style="margin: 8px 0;">
+        <small class="d-block text-center"><strong>Total PO Payment: ${totalPOPayment}</strong></small>
       `;
       document.getElementById('chartStats').innerHTML = statsHtml;
     }
