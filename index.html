@@ -386,6 +386,11 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function loadTableData() {
+  // Force clear old cache setiap kali load
+  // localStorage.removeItem('uploadedData');
+  // localStorage.removeItem('uploadedTime');
+  // localStorage.removeItem('uploadedBy');
+  
   // Cek apakah ada data yang diupload, jika ada gunakan itu, jika tidak gunakan data_monitoring.json
   let dataPromise;
   const uploadedData = localStorage.getItem('uploadedData');
@@ -541,7 +546,8 @@ function loadTableData() {
       let statusCount = {
         'received': 0,      // Submit Payment
         'waiting': 0,       // Waiting Payment
-        'paid': 0           // Paid
+        'paid': 0,          // Paid
+        'empty': 0          // Empty/Kosong
       };
 
       projectData.forEach(record => {
@@ -553,10 +559,12 @@ function loadTableData() {
           statusCount['waiting']++;
         } else if (poPayment.includes('paid')) {
           statusCount['paid']++;
+        } else {
+          statusCount['empty']++;
         }
       });
 
-      const totalPOPayment = statusCount['received'] + statusCount['waiting'] + statusCount['paid'];
+      const totalPOPayment = projectData.length;
 
       // Destroy existing chart jika ada
       if (chartInstance) {
@@ -630,8 +638,11 @@ function loadTableData() {
         <div class="mb-2">
           <small class="d-block"><span class="badge badge-payment">Sudah Payment</span>${statusCount.paid}</small>
         </div>
+        <div class="mb-2">
+          <small class="d-block"><span class="badge" style="background-color: #6c757d; color: #fff;">Belum Dipilih</span>${statusCount.empty}</small>
+        </div>
         <hr style="margin: 8px 0;">
-        <small class="d-block text-center"><strong>Total PO Payment: ${totalPOPayment}</strong></small>
+        <small class="d-block text-center"><strong>Total PO: ${totalPOPayment}</strong></small>
       `;
       document.getElementById('chartStats').innerHTML = statsHtml;
     }
