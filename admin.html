@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css" rel="stylesheet">
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
+  <div class="container-fluid">
+    <a class="navbar-brand fw-bold" href="index.html">Dashboard Admin</a>
+    <div class="d-flex ms-auto align-items-center gap-2">
+      <button id="logoutBtn" class="btn btn-outline-danger btn-sm d-none">Logout</button>
+    </div>
+  </div>
+</nav>
+<div class="container py-4">
+  <div id="loginCard" class="card mx-auto" style="max-width: 420px;">
+    <div class="card-body">
+      <h5 class="card-title">Login Admin</h5>
+      <form id="loginForm">
+        <div class="mb-3">
+          <label for="username" class="form-label">Username</label>
+          <input type="text" id="username" class="form-control" required>
+        </div>
+        <div class="mb-3">
+          <label for="password" class="form-label">Password</label>
+          <input type="password" id="password" class="form-control" required>
+        </div>
+        <button class="btn btn-primary w-100" type="submit">Masuk</button>
+      </form>
+      <div id="loginError" class="alert alert-danger mt-3 d-none" role="alert"></div>
+    </div>
+  </div>
+
+  <div id="adminPanel" class="d-none">
+    <div class="mb-3 d-flex justify-content-between align-items-center">
+      <div>
+        <h4>Admin Update Data</h4>
+        <p class="text-muted mb-0">Klik tombol edit untuk memperbarui PR Status, PO Payment, ETA, atau Remark.</p>
+      </div>
+      <button id="refreshBtn" class="btn btn-secondary btn-sm">Refresh</button>
+    </div>
+
+    <div class="table-responsive">
+      <table id="adminTable" class="table table-bordered table-hover align-middle" style="width:100%;">
+        <thead class="table-dark">
+          <tr>
+            <th>ID</th>
+            <th>Project Code</th>
+            <th>PR No</th>
+            <th>PO No</th>
+            <th>PR Status</th>
+            <th>PO Payment</th>
+            <th>ETA</th>
+            <th>Remark</th>
+            <th>Aksi</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="editModal" tabindex="-1" aria-labelledby="editModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editModalLabel">Edit Data Monitoring</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="editForm">
+          <input type="hidden" id="editId">
+          <div class="mb-3">
+            <label class="form-label">Project Code</label>
+            <input type="text" id="editProjectCode" class="form-control" readonly>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">PR No</label>
+            <input type="text" id="editPrNo" class="form-control" readonly>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">PO No</label>
+            <input type="text" id="editPoNo" class="form-control" readonly>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">PR Status</label>
+            <input type="text" id="editPrStatus" class="form-control">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">PO Payment</label>
+            <input type="text" id="editPoPayment" class="form-control">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">ETA</label>
+            <input type="text" id="editEta" class="form-control">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Remark</label>
+            <textarea id="editRemark" class="form-control" rows="3"></textarea>
+          </div>
+          <div id="editError" class="alert alert-danger d-none" role="alert"></div>
+          <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>

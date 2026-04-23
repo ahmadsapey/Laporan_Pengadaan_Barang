@@ -145,7 +145,7 @@
   <div class="container-fluid">
     <a class="navbar-brand fw-bold" href="#">Dashboard</a>
     <div class="d-flex ms-auto align-items-center gap-2">
-      <!-- <a href="admin.php" class="btn btn-outline-secondary btn-sm">Admin Panel</a> -->
+      <a href="admin.html" class="btn btn-outline-secondary btn-sm">Admin Panel</a>
     </div>
   </div>
 </nav>
@@ -158,7 +158,7 @@
           <small id="updateDateTime">Data terakhir diupdate: -</small>
         </div>
         <div class="text-center mt-2" style="font-size: 0.85rem; color: #495057;">
-          Data diperbarui secara otomatis dari file JSON.
+          Data diperbarui otomatis dari database server saat aplikasi dijalankan.
         </div>
       </div>
     </div>
@@ -250,11 +250,17 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function loadTableData() {
-  let dataPromise = fetch('data_monitoring.json').then(response => response.json()).catch(err => {
-    console.error('Error loading data:', err);
-    return [];
+  let dataPromise = fetch('/api/monitoring').then(response => {
+    if (!response.ok) throw new Error('API tidak tersedia');
+    return response.json();
+  }).catch(err => {
+    console.warn('Gagal memuat dari API, fallback ke data lokal:', err);
+    return fetch('data_monitoring.json').then(response => response.json()).catch(err2 => {
+      console.error('Error loading fallback data:', err2);
+      return [];
+    });
   });
-  fetchUpdateMeta().then(meta => {
+  fetch('/api/metadata').then(r => r.ok ? r.json() : null).then(meta => {
     const updateDateTimeElement = document.getElementById('updateDateTime');
     if (meta && meta.update_note && meta.update_time && meta.admin) {
       const updateDate = new Date(meta.update_time);
@@ -273,6 +279,8 @@ function loadTableData() {
     } else {
       updateDateTimeElement.textContent = 'Data terakhir diupdate: -';
     }
+  }).catch(() => {
+    document.getElementById('updateDateTime').textContent = 'Data terakhir diupdate: -';
   });
   dataPromise.then(data => {
     if (!Array.isArray(data) || data.length === 0) return;
