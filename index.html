@@ -221,7 +221,7 @@
 <script>
 // Ambil info update dari meta file
 function fetchUpdateMeta() {
-  return fetch('data_monitoring_meta.json')
+  return fetch('get_meta.php')
     .then(r => r.ok ? r.json() : null)
     .catch(() => null);
 }
@@ -250,7 +250,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function loadTableData() {
-  let dataPromise = fetch('data_monitoring.json').then(response => response.json()).catch(err => {
+  let dataPromise = fetch('get_data.php').then(response => response.json()).catch(err => {
     console.error('Error loading data:', err);
     return [];
   });
@@ -275,7 +275,7 @@ function loadTableData() {
     }
   });
   dataPromise.then(data => {
-    if (data.length === 0) return;
+    if (!Array.isArray(data) || data.length === 0) return;
     
     // Destroy previous datatable instance jika ada
     if ($.fn.DataTable.isDataTable('#monitoringTable')) {

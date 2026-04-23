@@ -3,6 +3,7 @@
 // File: admin.php
 
 session_start();
+require_once 'config.php';
 
 if (isset($_GET['logout'])) {
     session_unset();
@@ -20,6 +21,7 @@ if (!isset($_SESSION['admin_logged_in'])) {
             $error = 'Username atau password salah!';
         }
     }
+
     if (!isset($_SESSION['admin_logged_in'])) {
         ?>
         <!DOCTYPE html>
@@ -50,15 +52,17 @@ if (!isset($_SESSION['admin_logged_in'])) {
     }
 }
 
-function parseJsonFile($path, &$error) {
-    $json = file_get_contents($path);
+function validateJson($filePath, &$error) {
+    $json = file_get_contents($filePath);
     if ($json === false) {
         $error = 'Tidak dapat membaca file JSON.';
         return null;
     }
+
     $json = preg_replace('/^\xEF\xBB\xBF/', '', $json);
     $json = trim($json);
     $data = json_decode($json, true);
+
     if ($data === null && json_last_error() !== JSON_ERROR_NONE) {
         if (function_exists('mb_convert_encoding')) {
             $jsonUtf8 = mb_convert_encoding($json, 'UTF-8', 'Windows-1252');
@@ -72,37 +76,61 @@ function parseJsonFile($path, &$error) {
     return $data;
 }
 
-// Handle upload
 $success = $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_note'], $_POST['update_time'])) {
     $update_only = isset($_POST['update_only']);
-    $data = null;
 
-    if (!$update_only) {
+    if ($update_only) {
+        $stmt = $pdo->query('SELECT id FROM monitoring_pengadaan ORDER BY id DESC LIMIT 1');
+        $latest = $stmt->fetch();
+        if (!$latest) {
+            $error = 'Tidak ada data yang dapat diperbarui.';
+        } else {
+            $stmt = $pdo->prepare('UPDATE monitoring_pengadaan SET update_note = :update_note, update_time = :update_time WHERE id = :id');
+            $stmt->execute([
+                ':update_note' => $_POST['update_note'],
+                ':update_time' => $_POST['update_time'],
+                ':id' => $latest['id'],
+            ]);
+            $success = 'Keterangan update berhasil diperbarui!';
+        }
+    } else {
         if (!isset($_FILES['jsonFile']) || $_FILES['jsonFile']['error'] !== UPLOAD_ERR_OK) {
             $error = 'File JSON harus dipilih!';
         } else {
-            $data = parseJsonFile($_FILES['jsonFile']['tmp_name'], $error);
-        }
-    }
+            $data = validateJson($_FILES['jsonFile']['tmp_name'], $error);
+            if (!$error && $data !== null) {
+                if (!is_dir('uploads')) {
+                    mkdir('uploads', 0755, true);
+                }
 
-    if (!$error) {
-        $meta = [
-            'update_note' => $_POST['update_note'],
-            'update_time' => $_POST['update_time'],
-            'admin' => $_SESSION['admin_name'] ?? 'Admin'
-        ];
+                $originalName = preg_replace('/[^A-Za-z0-9._-]/', '_', basename($_FILES['jsonFile']['name']));
+                $uploadName = uniqid('upload_', true) . '_' . $originalName;
+                $uploadPath = 'uploads/' . $uploadName;
 
-        if (!$update_only && $data !== null) {
-            file_put_contents('data_monitoring.json', json_encode($data, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE));
+                if (move_uploaded_file($_FILES['jsonFile']['tmp_name'], $uploadPath)) {
+                    $stmt = $pdo->prepare('INSERT INTO monitoring_pengadaan (file_name, file_path, update_note, update_time, admin) VALUES (:file_name, :file_path, :update_note, :update_time, :admin)');
+                    $stmt->execute([
+                        ':file_name' => $_FILES['jsonFile']['name'],
+                        ':file_path' => $uploadPath,
+                        ':update_note' => $_POST['update_note'],
+                        ':update_time' => $_POST['update_time'],
+                        ':admin' => $_SESSION['admin_name'] ?? 'Admin',
+                    ]);
+                    $success = 'Data dan keterangan update berhasil disimpan!';
+                } else {
+                    $error = 'Gagal menyimpan file JSON ke server.';
+                }
+            }
         }
-        file_put_contents('data_monitoring_meta.json', json_encode($meta, JSON_PRETTY_PRINT|JSON_UNESCAPED_UNICODE));
-        $success = $update_only ? 'Keterangan update berhasil diperbarui!' : 'Data dan keterangan update berhasil disimpan!';
     }
 }
+
 $meta = [];
-if (file_exists('data_monitoring_meta.json')) {
-    $meta = json_decode(file_get_contents('data_monitoring_meta.json'), true);
+$stmt = $pdo->query('SELECT update_note, update_time, admin FROM monitoring_pengadaan ORDER BY id DESC LIMIT 1');
+$latest = $stmt->fetch();
+if ($latest) {
+    $meta = $latest;
 }
 ?>
 <!DOCTYPE html>
