@@ -1,7 +1,8 @@
 FROM php:8.1-apache
 
-# Disable conflicting MPM modules
-RUN a2dismod mpm_event mpm_worker && a2enmod mpm_prefork
+# Force disable all conflicting MPM modules and enable only prefork
+RUN rm -f /etc/apache2/mods-enabled/mpm_event.load /etc/apache2/mods-enabled/mpm_worker.load /etc/apache2/mods-enabled/mpm_itk.load && \
+    a2enmod mpm_prefork
 
 # Copy semua file ke direktori web server
 COPY . /var/www/html/
