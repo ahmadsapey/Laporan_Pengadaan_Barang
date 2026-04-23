@@ -144,6 +144,9 @@
 <nav class="navbar navbar-expand-lg navbar-light bg-light mb-4">
   <div class="container-fluid">
     <a class="navbar-brand fw-bold" href="#">Dashboard</a>
+    <div class="d-flex ms-auto align-items-center gap-2">
+      <a href="admin.php" class="btn btn-outline-secondary btn-sm">Admin Panel</a>
+    </div>
   </div>
 </nav>
 
@@ -153,6 +156,9 @@
         <h2 class="text-center">Monitoring Pengadaan Barang</h2>
         <div class="alert alert-info alert-sm text-center" style="margin: 0; padding: 0.5rem;">
           <small id="updateDateTime">Data terakhir diupdate: -</small>
+        </div>
+        <div class="text-center mt-2" style="font-size: 0.85rem; color: #495057;">
+          Update data dan keterangan manual di <strong>admin.php</strong> agar semua perangkat mendapat perubahan.
         </div>
       </div>
     </div>
@@ -166,7 +172,7 @@
                 <th>PO No</th>
                 <th>PR Date</th>
                 <th>PR Status</th>
-                <th>PO Paymnt</th>
+                <th>PO Payment</th>
             </tr>
             </thead>
             <tbody>
@@ -206,51 +212,70 @@
   </div>
 </div>
 
+
+
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
 
 <script>
-// --- SIMPLE DATA LOADING ---
-// Tidak perlu login, langsung load dari data_monitoring.json
+// Ambil info update dari meta file
+function fetchUpdateMeta() {
+  return fetch('data_monitoring_meta.json')
+    .then(r => r.ok ? r.json() : null)
+    .catch(() => null);
+}
 
 document.addEventListener('DOMContentLoaded', function() {
+  // Tambah tombol submit pencarian di mobile
+  if (window.innerWidth <= 576) {
+    setTimeout(() => {
+      const searchBox = document.querySelector('input[type="search"]');
+      if (searchBox && !document.getElementById('searchSubmitBtn')) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.id = 'searchSubmitBtn';
+        btn.className = 'btn btn-primary btn-sm ms-2';
+        btn.innerText = 'Cari';
+        btn.onclick = function() {
+          $(searchBox).trigger('input');
+        };
+        searchBox.parentNode.appendChild(btn);
+      }
+    }, 700);
+  }
+
   // Load data table saat pertama kali
   loadTableData();
 });
 
 function loadTableData() {
-  // Load langsung dari file data_monitoring.json
-  // Tidak ada localStorage, tidak ada upload logic
-  
-  const dataPromise = fetch('data_monitoring.json?t=' + new Date().getTime())
-    .then(response => response.json())
-    .catch(err => {
-      console.error('Error loading data:', err);
-      return [];
-    });
-  
-  // Update tanggal update data
-  const updateDateTimeElement = document.getElementById('updateDateTime');
-  const options = {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    timeZoneName: 'short'
-  };
-  const localDateStr = new Intl.DateTimeFormat('id-ID', options).format(new Date());
-  updateDateTimeElement.textContent = `📅 Data dimuat pada: ${localDateStr}`;
-  
-  dataPromise.then(data => {
-    if (data.length === 0) {
-      document.querySelector('#monitoringTable tbody').innerHTML = '<tr><td colspan="7" class="text-center text-muted py-5">Tidak ada data. Letakkan file data_monitoring.json di folder dashboard.</td></tr>';
-      updateDateTimeElement.textContent = 'ℹ️ Data kosong - tambahkan file data_monitoring.json';
-      return;
+  let dataPromise = fetch('data_monitoring.json').then(response => response.json()).catch(err => {
+    console.error('Error loading data:', err);
+    return [];
+  });
+  fetchUpdateMeta().then(meta => {
+    const updateDateTimeElement = document.getElementById('updateDateTime');
+    if (meta && meta.update_note && meta.update_time && meta.admin) {
+      const updateDate = new Date(meta.update_time);
+      const options = {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        timeZoneName: 'short'
+      };
+      const localDateStr = new Intl.DateTimeFormat('id-ID', options).format(updateDate);
+      updateDateTimeElement.textContent = `📅 ${meta.update_note} | Oleh: ${meta.admin} | Pada: ${localDateStr}`;
+    } else {
+      updateDateTimeElement.textContent = 'Data terakhir diupdate: -';
     }
+  });
+  dataPromise.then(data => {
+    if (data.length === 0) return;
     
     // Destroy previous datatable instance jika ada
     if ($.fn.DataTable.isDataTable('#monitoringTable')) {
@@ -358,7 +383,7 @@ function loadTableData() {
 
       projectData.forEach(record => {
         const poPayment = (record.PO_Payment || '').toLowerCase().trim();
-        
+
         if (poPayment.includes('submit')) {
           statusCount['received']++;
         } else if (poPayment.includes('waiting')) {
@@ -371,14 +396,6 @@ function loadTableData() {
       });
 
       const totalPOPayment = projectData.length;
-
-      // Debug log untuk memastikan data benar
-      console.log('DEBUG renderProjectChart:', {
-        projectCode: projectCode,
-        totalData: projectData.length,
-        statusCount: statusCount,
-        data: projectData.slice(0, 5)
-      });
 
       // Destroy existing chart jika ada
       if (chartInstance) {
@@ -444,13 +461,13 @@ function loadTableData() {
         </div>
         <hr style="margin: 8px 0;">
         <div class="mb-2">
-          <small class="d-block"><span class="badge badge-po-receipt">Submit Payment</span>${statusCount.received}</small>
+          <small class="d-block"><span class="badge badge-po-receipt">Sudah Diterima</span>${statusCount.received}</small>
         </div>
         <div class="mb-2">
-          <small class="d-block"><span class="badge" style="background-color: #dc3545; color: #fff;">Waiting Payment</span>${statusCount.waiting}</small>
+          <small class="d-block"><span class="badge" style="background-color: #dc3545; color: #fff;">Masih Proses</span>${statusCount.waiting}</small>
         </div>
         <div class="mb-2">
-          <small class="d-block"><span class="badge badge-payment">Paid</span>${statusCount.paid}</small>
+          <small class="d-block"><span class="badge badge-payment">Sudah Payment</span>${statusCount.paid}</small>
         </div>
         <div class="mb-2">
           <small class="d-block"><span class="badge" style="background-color: #6c757d; color: #fff;">Belum Dipilih</span>${statusCount.empty}</small>
