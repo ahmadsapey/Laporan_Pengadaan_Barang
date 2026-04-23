@@ -145,7 +145,7 @@
   <div class="container-fluid">
     <a class="navbar-brand fw-bold" href="#">Dashboard</a>
     <div class="d-flex ms-auto align-items-center gap-2">
-      <a href="admin.php" class="btn btn-outline-secondary btn-sm">Admin Panel</a>
+      <!-- <a href="admin.php" class="btn btn-outline-secondary btn-sm">Admin Panel</a> -->
     </div>
   </div>
 </nav>
@@ -158,7 +158,7 @@
           <small id="updateDateTime">Data terakhir diupdate: -</small>
         </div>
         <div class="text-center mt-2" style="font-size: 0.85rem; color: #495057;">
-          Update data dan keterangan manual di <strong>admin Panel</strong> .
+          Data diperbarui secara otomatis dari file JSON.
         </div>
       </div>
     </div>
@@ -221,7 +221,7 @@
 <script>
 // Ambil info update dari meta file
 function fetchUpdateMeta() {
-  return fetch('get_meta.php')
+  return fetch('meta.json')
     .then(r => r.ok ? r.json() : null)
     .catch(() => null);
 }
@@ -250,7 +250,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function loadTableData() {
-  let dataPromise = fetch('get_data.php').then(response => response.json()).catch(err => {
+  let dataPromise = fetch('data_monitoring.json').then(response => response.json()).catch(err => {
     console.error('Error loading data:', err);
     return [];
   });
